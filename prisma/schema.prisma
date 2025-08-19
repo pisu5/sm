@@ -1,0 +1,113 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   // hashed
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspaces Workspace[]
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownerId String
+  owner   User @relation(fields: [ownerId], references: [id])
+
+  agents        Agent[]
+  integrations  Integration[]
+  conversations Conversation[]
+}
+
+model Agent {
+  id        String   @id @default(cuid())
+  name      String
+  model     String   // e.g. gpt-4, gpt-5, llama2
+  prompt    String
+  settings  Json     // store temperature, system instructions, etc.
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  messages Message[]
+}
+
+model Integration {
+  id        String   @id @default(cuid())
+  type      String   // "web", "whatsapp", "slack", "mobile_app"
+  config    Json     // API keys, webhook URLs, etc.
+  createdAt DateTime @default(now())
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  conversations Conversation[]
+}
+
+model EndUser {
+  id        String   @id @default(cuid())
+  externalId String? // WhatsApp number, email, sessionId
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  conversations Conversation[]
+  messages      Message[]
+}
+
+model Conversation {
+  id            String   @id @default(cuid())
+  status        String   @default("open") // open, closed, pending
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspaceId   String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id])
+
+  integrationId String
+  integration   Integration @relation(fields: [integrationId], references: [id])
+
+  endUserId     String
+  endUser       EndUser @relation(fields: [endUserId], references: [id])
+
+  messages      Message[]
+}
+
+model Message {
+  id            String   @id @default(cuid())
+  role          String   // "user" | "agent" | "system"
+  content       String
+  createdAt     DateTime @default(now())
+
+  agentId       String?
+  agent         Agent? @relation(fields: [agentId], references: [id])
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+
+  endUserId     String?
+  endUser       EndUser? @relation(fields: [endUserId], references: [id])
+}
